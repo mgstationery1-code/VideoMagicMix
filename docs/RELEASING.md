@@ -64,7 +64,7 @@ npm run package
 2. `scripts/export_source.py` 导出干净源码 ZIP，用于交接；它不是安装包。
 3. 安装器及 SHA256 放 Releases，可另外提供 Portable EXE。
 4. 保留第三方许可，发布前落实所用 FFmpeg 构建的 GPL 完整对应源码获取方式。
-5. Actions 只构建并保留 artifact，不自动公开 Release；公开 Release 由维护者核验后手动创建。
+5. Actions 默认只构建并保留 artifact。维护者先创建 Release，再手动运行工作流并填写 `release_tag`（例如 `v0.1.0`），即可从该标签构建、验证并上传附件；留空只保留 artifact。发布任务不会覆盖已有同名附件，重复执行前应先核对现有文件。
 
 用户素材、配音、成片、环境文件、日志、`.venv` 和开发机路径不随包分发。
 项目/任务状态目前只存在内存中，重启后需要重新导入，尚不支持项目持久化。

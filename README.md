@@ -6,7 +6,7 @@ Windows 本地批量混剪工具，参考 [VideoMatrix](https://github.com/w2968
 
 ## 普通用户下载
 
-Windows 10/11 x64 用户应到本项目的 **Releases** 下载
+Windows 10/11 x64 用户应到 [Releases 下载页](https://github.com/mgstationery1-code/VideoMagicMix/releases) 下载
 `VideoMagicMix-Setup-版本-x64.exe`，安装后启动软件。不要下载 `Code → Download ZIP` 作为安装包。
 
 完整包包含独立 Python 后端、FFmpeg、FFprobe、Whisper small 模型与思源黑体。
@@ -54,7 +54,7 @@ npm run package:portable  # 单文件自解压便携版
 ```
 
 后端通过 PyInstaller 自带 Python 运行库，发布包不复制 `.venv`。
-细节见 [发布说明](docs/RELEASING.md)。Actions 可手动或由 v* 标签触发，结果保留为 artifact，不自动公开发布。
+细节见 [发布说明](docs/RELEASING.md)。Actions 可手动或由 v* 标签触发，默认保留 artifact；手动指定 `release_tag` 时，验证通过的安装包和校验文件会上传到该标签已存在的 Release。
 
 ## 使用
 
