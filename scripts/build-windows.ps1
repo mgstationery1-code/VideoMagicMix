@@ -3,6 +3,8 @@ param(
     [switch]$BackendOnly
 )
 $ErrorActionPreference = 'Stop'
+# Hosted Windows runners may default to cp1252; build logs include Chinese paths.
+$env:PYTHONUTF8 = '1'
 Set-Location (Split-Path -Parent $PSScriptRoot)
 if (-not (Test-Path '.venv/Scripts/python.exe')) {
     & python -m venv .venv
