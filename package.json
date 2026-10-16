@@ -1,0 +1,42 @@
+{
+  "name": "videomagicmix",
+  "version": "0.1.0",
+  "private": true,
+  "author": "VideoMagicMix contributors",
+  "license": "MIT",
+  "description": "VideoMagicMix desktop shell",
+  "main": "desktop/main.js",
+  "scripts": {
+    "desktop": "electron .",
+    "start": "electron .",
+    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -BackendOnly",
+    "package:dir": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Target dir",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Target nsis",
+    "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Target portable"
+  },
+  "build": {
+    "appId": "com.videomagicmix.app",
+    "productName": "VideoMagicMix",
+    "directories": { "output": "dist" },
+    "electronDist": "node_modules/electron/dist",
+    "files": ["desktop/**/*", "package.json"],
+    "extraResources": [
+      { "from": "build/backend/videomagicmix-backend", "to": "app-runtime" },
+      { "from": "frontend", "to": "app-runtime/frontend" },
+      { "from": "tools", "to": "app-runtime/tools", "filter": ["*.exe", "*.json", "ffmpeg-licenses/**/*"] },
+      { "from": "fonts", "to": "app-runtime/fonts" },
+      { "from": "data/models/faster-whisper-small", "to": "app-runtime/data/models/faster-whisper-small", "filter": ["config.json", "model.bin", "tokenizer.json", "vocabulary.txt"] },
+      { "from": "THIRD_PARTY_NOTICES.md", "to": "app-runtime/THIRD_PARTY_NOTICES.md" },
+      { "from": "LICENSE", "to": "app-runtime/LICENSE" },
+      { "from": "licenses", "to": "app-runtime/licenses" },
+      { "from": "build/dependency-licenses", "to": "app-runtime/licenses/python" }
+    ],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "signAndEditExecutable": false },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "deleteAppDataOnUninstall": false, "artifactName": "VideoMagicMix-Setup-${version}-${arch}.${ext}" },
+    "portable": { "artifactName": "VideoMagicMix-Portable-${version}-${arch}.${ext}" }
+  },
+  "devDependencies": {
+    "electron": "^32.2.7",
+    "electron-builder": "^25.1.8"
+  }
+}

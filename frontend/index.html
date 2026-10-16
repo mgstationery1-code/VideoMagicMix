@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VideoMagicMix</title><link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<main class="app-shell">
+  <header class="topbar"><div class="brand">VideoMagicMix <span class="brand-sub">混剪工作台</span></div><div class="top-actions"><button class="ghost" id="contact">联系我</button><button class="ghost" id="theme">Light</button><span id="health" class="ready">连接中</span></div></header>
+  <div class="workspace-layout">
+    <section class="left-column">
+      <section class="section-box materials">
+        <div class="section-heading"><span>素材</span><span class="tag">成品 Hook</span></div>
+        <div class="resource-row"><span class="resource-icon">⚡</span><strong>Hook 首段</strong><input id="hookDir" placeholder="请选择 Hook 文件夹" readonly><span id="hookStatus" class="muted">所有视频完整直用</span><button class="outline" data-folder="hook">浏览</button><button class="outline" data-clear="hook">清除</button></div>
+        <div class="body-panel">
+          <div class="body-heading"><span>Body 后段</span><button class="tab active">普通</button><button class="tab">分组</button></div>
+          <div class="body-preview-bar"><label>字幕方案<select id="schemeSelect" disabled></select></label><div id="bodyPreview" class="body-preview"><span class="muted">导入 Excel 后显示当前字幕方案的 Body 文案</span></div></div>
+        </div>
+        <div class="resource-row"><span class="resource-icon">♫</span><strong>BGM 配乐</strong><input placeholder="浏览或粘贴路径"><button class="outline">目录</button><button class="outline">视频</button><button class="outline">Body 关</button><button class="outline">清除</button></div>
+        <div class="resource-row"><span class="resource-icon">▧</span><strong>水印</strong><input placeholder="选择或粘贴路径"><button class="outline">选择</button><button class="outline">Body 关</button></div>
+        <div class="resource-row"><span class="resource-icon">▣</span><strong>输出目录</strong><input id="outputDir" placeholder="请选择输出文件夹" readonly><button class="outline" data-folder="output">浏览</button></div>
+      </section>
+      <section class="section-box compact-panel">
+        <div class="params-grid"><div><div class="mini-title">产能</div><label>生成数量<input id="outputLimit" type="number" min="0" step="1" value="0" placeholder="0=全部"></label><div id="capacitySummary" class="capacity-summary">预计产能：未预检</div></div><div><div class="mini-title">音量</div><label>BGM-R<input value="0.3"></label><label>Hook声<input value="100" readonly> %</label><label>Body声<input value="0" readonly> %</label><label>配音<input value="100" readonly> %</label></div><div class="action-stack"><button id="preflight" class="primary">预检产能</button><button id="renderSelected" class="primary">启动渲染</button><button id="clearLog" class="primary">清除记录</button><button id="stop" class="danger">停止</button><button class="ghost wide">智能压测</button></div></div>
+      </section>
+      <section class="section-box output-panel"><div class="section-heading"><span>输出</span></div><div class="output-grid"><label>分辨率<input value="1080×1920"></label><span class="resolution-label">1080P</span><button class="small active-button">1080P</button><button class="small">2K</button><label>码率<input value="5000k"></label><label>帧率<input value="30"></label><label class="checkline"><input type="checkbox" checked> GPU</label><label class="checkline"><input type="checkbox"> 随机出帧</label></div></section>
+      <section class="section-box subtitle-style-panel">
+        <div class="section-heading"><span>字幕样式</span><span id="fontStats" class="muted">正在读取字体</span></div>
+        <div class="subtitle-style-layout">
+          <div class="subtitle-style-controls">
+            <label>字体<select id="subtitleFont"></select></label>
+            <label>字号<input id="subtitleFontSize" type="number" min="24" max="96" step="1" value="52"></label>
+            <label class="checkline"><input id="subtitleBold" type="checkbox" checked> 粗体</label>
+            <label>文字颜色<input id="subtitlePrimaryColor" type="color" value="#ffffff"></label>
+            <label>描边颜色<input id="subtitleOutlineColor" type="color" value="#000000"></label>
+            <label>描边<input id="subtitleOutlineWidth" type="number" min="0" max="8" step="1" value="3"></label>
+            <label>阴影<input id="subtitleShadow" type="number" min="0" max="6" step="1" value="1"></label>
+            <label>位置<select id="subtitleAlignment"><option value="8">顶部居中</option><option value="5">中部居中</option><option value="2" selected>底部居中</option></select></label>
+            <label>底部边距<input id="subtitleMargin" type="number" min="0" max="600" step="1" value="120"></label>
+            <label>最大宽度<input id="subtitleMaxWidth" type="number" min="50" max="100" step="1" value="90"> %</label>
+            <label>字幕字数阈值<input id="subtitleMaxChars" type="number" min="1" max="50" step="1" value="10"></label>
+          </div>
+          <div class="subtitle-preview-box"><div class="subtitle-preview-toolbar"><label>预览段落<select id="subtitlePreviewSegment"></select></label><button id="refreshSubtitlePreview" class="outline">刷新预览</button></div><img id="subtitlePreview" class="subtitle-preview-image hidden" alt="字幕样式预览"><div id="subtitlePreviewMessage" class="muted">导入 Excel 并选择 Body 素材后显示真实字幕预览</div><div id="subtitleCueList" class="subtitle-cue-list"></div></div>
+        </div>
+      </section>
+    </section>
+    <aside class="right-column section-box"><nav class="status-tabs"><button class="active">日志 <span id="logCount">0</span></button><button>任务 <span id="taskCount">0</span></button><button>产出 <span id="outputCount">0</span></button><button>去重变换 <span class="off">OFF</span></button></nav><div id="statusLog" class="status-log"><div class="muted">等待导入 Excel</div></div><div id="taskList" class="task-list"></div><div id="outputList" class="output-list"></div></aside>
+  </div>
+  <section id="importBar" class="bottom-panel"><input id="xlsx" type="file" accept=".xlsx,.xlsm"><button id="import" class="primary">导入 Excel</button><span id="projectState" class="muted"></span><div id="errors" class="error-text"></div><div id="warnings" class="warning-text"></div></section>
+  <section id="schemePanel" class="bottom-panel hidden"><div class="section-heading"><span>字幕方案与配音</span><span class="muted">每个方案上传一条只朗读启用 Body 的完整配音（不包含 Hook）</span></div><div id="schemeList"></div></section>
+  <pre id="preflightResult" class="diagnostic hidden"></pre>
+</main><script src="/static/app.js"></script>
+</body></html>

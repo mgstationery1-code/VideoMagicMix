@@ -1,0 +1,38 @@
+# Local runtimes and dependency installs
+.venv/
+node_modules/
+
+# Generated desktop builds
+dist/
+build/
+.build-cache/
+release/
+tools/*.exe
+tools/ffmpeg-licenses/
+tools/ASSET-RECORD.json
+fonts/*.otf
+fonts/*.ttf
+fonts/SourceHanSans-LICENSE.txt
+
+# Runtime data
+data/uploads/
+data/projects/
+data/cache/
+data/previews/
+data/models/*
+!data/models/.gitkeep
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local logs and editor metadata
+*.log
+.vscode/
+.idea/
+.env
+.env.*
+!.env.example
+Thumbs.db
+.DS_Store
