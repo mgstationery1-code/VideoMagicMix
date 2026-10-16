@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import zipfile
@@ -54,6 +55,10 @@ def download_ffmpeg(archive: Path) -> None:
     """Resume bounded range requests on networks that stall large downloads."""
     if archive.is_file() and sha256(archive) == FFMPEG_SHA256:
         return
+    # Hosted runners have fast release downloads, but shared anonymous API quotas.
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        download(FFMPEG_URL, archive, FFMPEG_SHA256)
+        return
     endpoint = "https://api.github.com/repos/GyanD/codexffmpeg/releases/assets/411752976"
     response = subprocess.check_output(
         ["curl.exe", "--fail", "--silent", "--show-error", "--head",
@@ -99,8 +104,8 @@ def prepare_models() -> None:
 def prepare_font() -> None:
     font = ROOT / "fonts/SourceHanSansSC-Regular.otf"
     if not font.is_file():
-        download("https://api.github.com/repos/adobe-fonts/source-han-sans/git/blobs/8113ad53da18b6a08b133c6c460ae1d818a0f865",
-                 font, headers=("Accept: application/vnd.github.raw+json",))
+        download(f"https://raw.githubusercontent.com/adobe-fonts/source-han-sans/{FONT_REVISION}/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf",
+                 font)
     content = font.read_bytes()
     digest = hashlib.sha1(f"blob {len(content)}\0".encode() + content).hexdigest()
     if digest != "8113ad53da18b6a08b133c6c460ae1d818a0f865":
@@ -113,8 +118,7 @@ def prepare_font() -> None:
 def download_github_text(repository: str, name: str, revision: str, target: Path) -> None:
     if target.is_file():
         return
-    download(f"https://api.github.com/repos/{repository}/contents/{name}?ref={revision}",
-             target, headers=("Accept: application/vnd.github.raw+json",))
+    download(f"https://raw.githubusercontent.com/{repository}/{revision}/{name}", target)
 
 
 def prepare_media_tools() -> None:
