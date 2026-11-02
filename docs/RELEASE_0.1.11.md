@@ -24,4 +24,4 @@
 
 ## 验收记录
 
-原 v0.1.11 已通过74项 Python 测试、8项窗口测试、离线词级 ASR 和合成素材完整渲染/解码。正式发布资源补齐后的验证以 GitHub Actions 结果及 Release 中的验收说明为准；不把本机通过当作用户另一台电脑已经验收。
+原 v0.1.11 已通过74项 Python 测试、8项窗口测试、离线词级 ASR 和合成素材完整渲染/解码。发布资源补齐后，[干净 Windows 构建/识别/渲染](https://github.com/mgstationery1-code/VideoMagicMix/actions/runs/41383381400) 与 [另一台干净 Windows 安装/解压/离线识别/全片解码](https://github.com/mgstationery1-code/VideoMagicMix/actions/runs/41384070475) 均已通过。GitHub 发布附件摘要与 SHA256SUMS 一致。测试使用合成素材和非私人配音，不等于用户每条业务录音都能匹配。
