@@ -1,0 +1,67 @@
+name: Verify Windows release installation
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Successful Build Windows installer run ID'
+        type: string
+        required: true
+permissions:
+  actions: read
+  contents: read
+jobs:
+  install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: VideoMagicMix-Windows-x64
+          path: release
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify all downloaded assets, ZIP and update metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-Content release/SHA256SUMS.txt | ForEach-Object {
+            if ($_ -notmatch '^([a-f0-9]{64})\s+(.+)$') { throw 'Malformed checksum line' }
+            $expected = $Matches[1]
+            $asset = Join-Path release $Matches[2]
+            if ((Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash -ne $expected) { throw "Checksum mismatch: $asset" }
+          }
+          $zip = Get-ChildItem release/*Windows*.zip
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath C:/vmm-zip
+          $manifest = Get-Content C:/vmm-zip/FILE-MANIFEST.json -Raw | ConvertFrom-Json
+          foreach ($item in $manifest.files) {
+            $path = Join-Path C:/vmm-zip $item.path
+            if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $item.sha256) { throw "Manifest mismatch: $($item.path)" }
+          }
+          Expand-Archive -Path release/*Source*.zip -DestinationPath C:/vmm-source
+          python -c "import base64,hashlib,pathlib; d=pathlib.Path('release'); installer=next(d.glob('*Setup*.exe')); manifest=(d/'latest.yml').read_text(); assert base64.b64encode(hashlib.sha512(installer.read_bytes()).digest()).decode() in manifest; print('All assets, ZIP files and updater SHA512 verified')"
+      - name: Install NSIS on a fresh Windows runner
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem release/*Setup*.exe).FullName
+          $process = Start-Process -FilePath $installer -ArgumentList '/S', '/D=C:\vmm-installed' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Installer exit code: $($process.ExitCode)" }
+          if (-not (Test-Path C:/vmm-installed/VideoMagicMix.exe)) { throw 'Installed EXE missing' }
+      - name: Exercise both directory and installed versions
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          Set-Location C:/vmm-source/VideoMagicMix
+          python -m pip install openpyxl==3.1.5 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Test harness dependencies failed' }
+          python scripts/smoke_desktop.py C:/vmm-zip/VideoMagicMix.exe
+          if ($LASTEXITCODE -ne 0) { throw 'ZIP desktop startup failed' }
+          python scripts/smoke_desktop.py C:/vmm-installed/VideoMagicMix.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Installed desktop startup failed' }
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make_smoke_voice.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Test voice creation failed' }
+          python scripts/smoke_packaged.py C:/vmm-installed/resources/app-runtime --voice build/smoke-voice.wav --render
+          if ($LASTEXITCODE -ne 0) { throw 'Installed offline ASR/render failed' }
+          'PASS clean Windows NSIS installation, complete ZIP manifest, desktop startup, offline ASR, rendering and full decoding.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
