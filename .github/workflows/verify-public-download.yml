@@ -1,0 +1,35 @@
+name: Verify public download and Codex install
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        type: string
+        required: true
+        default: '0.1.11'
+permissions:
+  contents: read
+jobs:
+  public-install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install from public release without a GitHub token
+        shell: powershell
+        env:
+          INSTALL_VERSION: ${{ inputs.version }}
+        run: |
+          ./scripts/install-windows.ps1 -Version $env:INSTALL_VERSION -Destination C:/vmm-public-install -NoLaunch
+          if ($LASTEXITCODE -ne 0) { throw 'Public installer failed.' }
+      - name: Start publicly downloaded version offline
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python scripts/smoke_desktop.py C:/vmm-public-install/VideoMagicMix.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Public EXE startup failed.' }
+          python scripts/smoke_packaged.py C:/vmm-public-install/resources/app-runtime
+          if ($LASTEXITCODE -ne 0) { throw 'Public runtime dependency check failed.' }
+          'PASS public anonymous download, SHA256, all files, Codex install script, desktop and bundled model/tool discovery.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
