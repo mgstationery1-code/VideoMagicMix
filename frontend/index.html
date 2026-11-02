@@ -2,34 +2,55 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>VideoMagicMix</title><link rel="stylesheet" href="/static/styles.css">
+  <title>VideoMagicMix 0.1.11</title><link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/silver-night.css"><style>.body-preview-bar{grid-template-columns:150px minmax(0,1fr)}.body-preview-toolbar{display:flex;flex-direction:column;gap:7px}.body-preview-toolbar label{display:flex;flex-direction:column;gap:5px}.body-preview-toolbar button{width:100%;font-size:12px;padding:0 7px}</style>
 </head>
 <body>
+<div class="window-top-drag-strip" aria-hidden="true"></div>
 <main class="app-shell">
-  <header class="topbar"><div class="brand">VideoMagicMix <span class="brand-sub">混剪工作台</span></div><div class="top-actions"><button class="ghost" id="contact">联系我</button><button class="ghost" id="theme">Light</button><span id="health" class="ready">连接中</span></div></header>
+  <header class="topbar"><div class="titlebar-start"><div id="windowControls" class="window-controls" role="group" aria-label="窗口控制" hidden><button type="button" class="window-control window-close" data-window-action="close" title="关闭" aria-label="关闭窗口"><span aria-hidden="true">×</span></button><button type="button" class="window-control window-minimize" data-window-action="minimize" title="最小化" aria-label="最小化窗口"><span aria-hidden="true">−</span></button><button type="button" class="window-control window-maximize" data-window-action="toggle-maximize" title="最大化" aria-label="最大化窗口" aria-pressed="false"><span aria-hidden="true">+</span></button></div><div class="brand">VideoMagicMix <span class="brand-sub">v0.1.11 · 均衡轮换</span></div></div><div class="titlebar-drag-region" aria-hidden="true"></div><div class="top-actions"><button class="ghost" id="checkUpdates" title="检查 mgstationery1-code/VideoMagicMix 的正式发行版">检查更新</button><span id="updateStatus" class="muted" aria-live="polite"></span><button class="ghost" id="contact">联系我</button><span class="tag" id="theme" aria-label="当前主题">银蓝夜航</span><span id="health" class="ready">连接中</span></div></header>
   <div class="workspace-layout">
     <section class="left-column">
       <section class="section-box materials">
         <div class="section-heading"><span>素材</span><span class="tag">成品 Hook</span></div>
         <div class="resource-row"><span class="resource-icon">⚡</span><strong>Hook 首段</strong><input id="hookDir" placeholder="请选择 Hook 文件夹" readonly><span id="hookStatus" class="muted">所有视频完整直用</span><button class="outline" data-folder="hook">浏览</button><button class="outline" data-clear="hook">清除</button></div>
         <div class="body-panel">
-          <div class="body-heading"><span>Body 后段</span><button class="tab active">普通</button><button class="tab">分组</button></div>
-          <div class="body-preview-bar"><label>字幕方案<select id="schemeSelect" disabled></select></label><div id="bodyPreview" class="body-preview"><span class="muted">导入 Excel 后显示当前字幕方案的 Body 文案</span></div></div>
+          <div class="body-heading"><span>Body 后段</span><button class="tab active">普通</button><button class="tab">分组</button><label class="body-root-picker"><span>素材根目录</span><input id="bodyRootDir" placeholder="选择包含所有 Body 分组目录的根文件夹" readonly><button id="selectBodyRoot" class="outline">选择并自动匹配</button><button id="clearBodyRoot" class="outline">清除根目录</button></label></div>
+          <div class="body-preview-bar"><div class="body-preview-toolbar"><label>字幕方案<select id="schemeSelect" disabled></select></label><button id="rescanScheme" class="outline" disabled>重新识别并扫描</button></div><div id="bodyPreview" class="body-preview"><span class="muted">导入 Excel 后显示当前字幕方案的 Body 文案</span></div></div>
         </div>
-        <div class="resource-row"><span class="resource-icon">♫</span><strong>BGM 配乐</strong><input placeholder="浏览或粘贴路径"><button class="outline">目录</button><button class="outline">视频</button><button class="outline">Body 关</button><button class="outline">清除</button></div>
+        <div class="resource-row bgm-resource-row"><span class="resource-icon">♫</span><strong>BGM 配乐</strong><input id="bgmPath" placeholder="选择背景音乐文件" readonly><input id="bgmFile" type="file" accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/*" hidden><button id="selectBgm" class="outline">添加音频</button><button id="clearBgm" class="outline">清除</button><span id="bgmStatus" class="muted">可选</span></div>
         <div class="resource-row"><span class="resource-icon">▧</span><strong>水印</strong><input placeholder="选择或粘贴路径"><button class="outline">选择</button><button class="outline">Body 关</button></div>
         <div class="resource-row"><span class="resource-icon">▣</span><strong>输出目录</strong><input id="outputDir" placeholder="请选择输出文件夹" readonly><button class="outline" data-folder="output">浏览</button></div>
       </section>
       <section class="section-box compact-panel">
-        <div class="params-grid"><div><div class="mini-title">产能</div><label>生成数量<input id="outputLimit" type="number" min="0" step="1" value="0" placeholder="0=全部"></label><div id="capacitySummary" class="capacity-summary">预计产能：未预检</div></div><div><div class="mini-title">音量</div><label>BGM-R<input value="0.3"></label><label>Hook声<input value="100" readonly> %</label><label>Body声<input value="0" readonly> %</label><label>配音<input value="100" readonly> %</label></div><div class="action-stack"><button id="preflight" class="primary">预检产能</button><button id="renderSelected" class="primary">启动渲染</button><button id="clearLog" class="primary">清除记录</button><button id="stop" class="danger">停止</button><button class="ghost wide">智能压测</button></div></div>
+        <div class="params-grid">
+          <div><div class="mini-title">均衡轮换 · 预检与生成</div><label>生成数量<input id="outputLimit" type="number" min="0" max="5000" step="1" value="30" placeholder="默认30"></label>
+            <label>关注最近<select id="recentWindow"><option value="1">1条</option><option value="2">2条</option><option value="3" selected>3条</option><option value="4">4条</option><option value="5">5条</option><option value="10">10条</option></select></label>
+            <label class="overlap-limit" title="只比较 Body 共用素材的画面时长；Hook 独立轮换。不是视觉相似度或全批次任意两条的保证。">Body复用目标<input id="maxOverlap" type="number" min="0" max="100" step="0.1" value="50" placeholder="留空只报告"><span>%</span></label>
+            <div class="muted overlap-help">按素材曝光均衡轮换，优先变化长画面。只检查每条与前几条的 Body；超标不会缩减数量，需明确接受。0 / 留空按理论组合数安排，每批最多5000条。</div>
+            <div id="capacitySummary" class="capacity-summary">理论产能：未预检</div>
+            <div id="batchOverlapSummary" class="batch-overlap-summary">近期最高 Body 复用率：待计算</div>
+            <div id="planStatus" class="plan-status" role="status">请先预检，确认数量和重复率后开始渲染</div>
+            <div id="searchSummary" class="muted overlap-help"></div>
+            <button id="viewRotationDetails" class="outline" type="button">查看选材与复用明细</button>
+            <button id="acceptRotation" class="outline hidden" type="button">接受当前未达标安排</button></div>
+          <div><div class="mini-title">音量（100%=原音量）</div>
+            <label class="volume-control">配音<input id="voiceVolume" type="range" min="0" max="500" step="1" value="100"><output id="voiceVolumeValue">100%</output></label>
+            <label class="volume-control">BGM<input id="bgmVolume" type="range" min="0" max="500" step="1" value="30"><output id="bgmVolumeValue">30%</output></label>
+            <label class="volume-control">Hook<input id="hookVolume" type="range" min="0" max="500" step="1" value="100"><output id="hookVolumeValue">100%</output></label>
+            <span class="muted">BGM 仅用于 Body，Hook 保留原声；Body 原声静音；混音启用峰值保护。</span>
+            <label>试听文案<select id="audioPreviewSegment"><option value="">配音前12秒</option></select></label>
+            <button id="previewAudioMix" class="outline audio-preview-button">试听所选片段</button><audio id="audioMixPreview" class="audio-mix-preview hidden" controls preload="none"></audio>
+          </div><div class="action-stack"><button id="preflight" class="primary">预检并计算</button><button id="renderSelected" class="primary" disabled title="使用预检确认的同一批组合">开始渲染</button><button id="clearLog" class="primary">清除记录</button><button id="stop" class="danger">停止</button><button class="ghost wide">智能压测</button></div>
+        </div>
       </section>
-      <section class="section-box output-panel"><div class="section-heading"><span>输出</span></div><div class="output-grid"><label>分辨率<input value="1080×1920"></label><span class="resolution-label">1080P</span><button class="small active-button">1080P</button><button class="small">2K</button><label>码率<input value="5000k"></label><label>帧率<input value="30"></label><label class="checkline"><input type="checkbox" checked> GPU</label><label class="checkline"><input type="checkbox"> 随机出帧</label></div></section>
+      <section class="section-box output-panel"><div class="section-heading"><span>输出</span><span class="muted">剪映常见参数，可按需调整</span></div><div class="output-grid"><label>分辨率<select id="outputResolution"><option value="1080x1920">1080×1920</option><option value="2160x3840">2160×3840</option></select></label><label>格式<select id="outputFormat"><option value="mov">MOV</option><option value="mp4">MP4</option></select></label><label>帧率<select id="outputFps"><option>24</option><option>25</option><option selected>30</option><option>50</option><option>60</option></select></label><label>视频码率<select id="outputVideoBitrate"><option value="8M">较低 · 8 Mbps</option><option value="12M">标准 · 12 Mbps</option><option value="20M" selected>较高 · 20 Mbps</option><option value="35M">极高 · 35 Mbps</option></select></label><label>视频编码<select id="outputVideoCodec"><option value="hevc">HEVC</option><option value="h264">H.264</option></select></label><label>音频质量<select id="outputAudioBitrate"><option value="128k">AAC 128 kbps</option><option value="192k" selected>AAC 192 kbps</option><option value="256k">AAC 256 kbps</option><option value="320k">AAC 320 kbps</option></select></label><label>音频采样率<select id="outputAudioSampleRate"><option value="44100" selected>44100 Hz</option><option value="48000">48000 Hz</option></select></label></div></section>
       <section class="section-box subtitle-style-panel">
         <div class="section-heading"><span>字幕样式</span><span id="fontStats" class="muted">正在读取字体</span></div>
         <div class="subtitle-style-layout">
           <div class="subtitle-style-controls">
             <label>字体<select id="subtitleFont"></select></label>
             <label>字号<input id="subtitleFontSize" type="number" min="24" max="96" step="1" value="52"></label>
+            <details class="subtitle-more"><summary>更多字幕选项</summary><div class="subtitle-advanced-controls">
             <label class="checkline"><input id="subtitleBold" type="checkbox" checked> 粗体</label>
             <label>文字颜色<input id="subtitlePrimaryColor" type="color" value="#ffffff"></label>
             <label>描边颜色<input id="subtitleOutlineColor" type="color" value="#000000"></label>
@@ -39,15 +60,17 @@
             <label>底部边距<input id="subtitleMargin" type="number" min="0" max="600" step="1" value="120"></label>
             <label>最大宽度<input id="subtitleMaxWidth" type="number" min="50" max="100" step="1" value="90"> %</label>
             <label>字幕字数阈值<input id="subtitleMaxChars" type="number" min="1" max="50" step="1" value="10"></label>
+            </div></details>
           </div>
           <div class="subtitle-preview-box"><div class="subtitle-preview-toolbar"><label>预览段落<select id="subtitlePreviewSegment"></select></label><button id="refreshSubtitlePreview" class="outline">刷新预览</button></div><img id="subtitlePreview" class="subtitle-preview-image hidden" alt="字幕样式预览"><div id="subtitlePreviewMessage" class="muted">导入 Excel 并选择 Body 素材后显示真实字幕预览</div><div id="subtitleCueList" class="subtitle-cue-list"></div></div>
         </div>
       </section>
     </section>
-    <aside class="right-column section-box"><nav class="status-tabs"><button class="active">日志 <span id="logCount">0</span></button><button>任务 <span id="taskCount">0</span></button><button>产出 <span id="outputCount">0</span></button><button>去重变换 <span class="off">OFF</span></button></nav><div id="statusLog" class="status-log"><div class="muted">等待导入 Excel</div></div><div id="taskList" class="task-list"></div><div id="outputList" class="output-list"></div></aside>
+    <aside class="right-column section-box"><nav class="status-tabs" role="tablist" aria-label="任务与日志"><button class="active" type="button" role="tab" aria-selected="true" data-panel="logs">日志 <span id="logCount">0</span></button><button type="button" role="tab" aria-selected="false" data-panel="tasks">任务 <span id="taskCount">0 / 0</span></button><button type="button" role="tab" aria-selected="false" data-panel="outputs">产出 <span id="outputCount">0</span></button><button type="button" role="tab" aria-selected="false" data-panel="dedupe">去重变化</button></nav><div class="status-panel active" data-panel-content="logs"><div id="statusLog" class="status-log"><div class="muted">等待导入 Excel</div></div></div><div class="status-panel hidden" data-panel-content="tasks"><div id="taskList" class="task-list"></div></div><div class="status-panel hidden" data-panel-content="outputs"><div class="output-toolbar"><span id="outputHealth">健康视频 0 条</span><button id="openOutputDir" class="outline" type="button" disabled>打开产出目录</button></div><div id="outputList" class="output-list"></div></div><div class="status-panel hidden" data-panel-content="dedupe"><div id="dedupeSummary" class="dedupe-summary"><div>尚无预检数据</div></div></div></aside>
   </div>
   <section id="importBar" class="bottom-panel"><input id="xlsx" type="file" accept=".xlsx,.xlsm"><button id="import" class="primary">导入 Excel</button><span id="projectState" class="muted"></span><div id="errors" class="error-text"></div><div id="warnings" class="warning-text"></div></section>
   <section id="schemePanel" class="bottom-panel hidden"><div class="section-heading"><span>字幕方案与配音</span><span class="muted">每个方案上传一条只朗读启用 Body 的完整配音（不包含 Hook）</span></div><div id="schemeList"></div></section>
   <pre id="preflightResult" class="diagnostic hidden"></pre>
-</main><script src="/static/app.js"></script>
+  <footer class="muted" style="font-size:12px;padding:8px 2px">本软件使用 HarmonyOS Sans Fonts · Copyright 2021 Huawei Device Co., Ltd. · <a href="/static/assets/fonts/LICENSE.txt" target="_blank" rel="noopener">字体许可</a></footer>
+</main><script src="/static/window-controls.js"></script><script src="/static/app.js"></script>
 </body></html>

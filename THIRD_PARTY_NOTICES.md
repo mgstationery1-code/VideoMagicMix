@@ -11,6 +11,7 @@ their own licenses; the application license does not replace them.
 | faster-whisper / CTranslate2 | https://github.com/SYSTRAN/faster-whisper / https://github.com/OpenNMT/CTranslate2 | MIT; collected installed-distribution licenses |
 | Whisper small weights | https://huggingface.co/Systran/faster-whisper-small | OpenAI Whisper MIT; `licenses/Whisper-MIT.txt` |
 | Source Han Sans SC Regular | https://github.com/adobe-fonts/source-han-sans | SIL OFL 1.1; `fonts/SourceHanSans-LICENSE.txt` |
+| HarmonyOS Sans SC Regular / Bold | Huawei; fixed distribution mirror described in `frontend/assets/fonts/README.md` | HarmonyOS Sans Fonts License Agreement; unmodified `frontend/assets/fonts/LICENSE.txt`; Copyright 2021 Huawei Device Co., Ltd. |
 | FFmpeg / FFprobe 8.1.1 essentials | https://github.com/GyanD/codexffmpeg/releases/tag/8.1.1 | GPL-enabled build; archive notices in `tools/ffmpeg-licenses/` |
 
 Python package versions and available upstream license files are collected into

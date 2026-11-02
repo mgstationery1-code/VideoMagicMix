@@ -21,8 +21,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Preparing release assets failed. Check the dow
 if ($LASTEXITCODE -ne 0) { throw 'Backend tests failed.' }
 & $taskPython scripts/collect_licenses.py
 if ($LASTEXITCODE -ne 0) { throw 'Collecting third-party notices failed.' }
-& $taskPython -m PyInstaller --noconfirm --clean --distpath build/backend --workpath build/pyinstaller backend/videomagicmix-backend.spec
+$freezeRoot = Join-Path $env:TEMP ('vmm-freeze-' + [guid]::NewGuid().ToString('N').Substring(0,8))
+& $taskPython -m PyInstaller --noconfirm --clean --distpath $freezeRoot --workpath build/pyinstaller backend/videomagicmix-backend.spec
 if ($LASTEXITCODE -ne 0) { throw 'Building standalone backend failed.' }
+& robocopy (Join-Path $freezeRoot 'videomagicmix-backend') build/backend/videomagicmix-backend /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /NP
+if ($LASTEXITCODE -ge 8) { throw 'Copying frozen runtime failed.' }
 if ($BackendOnly) { exit 0 }
 if (-not (Test-Path 'node_modules/.bin/electron-builder.cmd')) {
     & npm.cmd ci
@@ -30,12 +33,20 @@ if (-not (Test-Path 'node_modules/.bin/electron-builder.cmd')) {
 }
 & node --check desktop/main.js
 if ($LASTEXITCODE -ne 0) { throw 'Desktop syntax check failed.' }
+& node --test scripts/test-window-controls.cjs
+if ($LASTEXITCODE -ne 0) { throw 'Window-control tests failed.' }
 & npx.cmd electron-builder --win $Target --x64 --publish never
 if ($LASTEXITCODE -ne 0) { throw 'Packaging Windows application failed.' }
-& $taskPython scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/make_smoke_voice.ps1
+if ($LASTEXITCODE -ne 0) { throw 'Generating non-private smoke audio failed.' }
+& $taskPython scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime --voice build/smoke-voice.wav --render
 if ($LASTEXITCODE -ne 0) { throw 'Standalone runtime smoke test failed.' }
 & $taskPython scripts/smoke_desktop.py dist/win-unpacked/VideoMagicMix.exe
 if ($LASTEXITCODE -ne 0) { throw 'Packaged desktop smoke test failed.' }
+& $taskPython scripts/export_source.py
+if ($LASTEXITCODE -ne 0) { throw 'Source export failed.' }
+& $taskPython scripts/package_directory.py
+if ($LASTEXITCODE -ne 0) { throw 'Directory package or file manifest failed.' }
 Get-ChildItem dist -File -Filter '*.exe' | ForEach-Object {
     $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath ($_.FullName + '.sha256') -Value ($digest + '  ' + $_.Name) -Encoding ASCII

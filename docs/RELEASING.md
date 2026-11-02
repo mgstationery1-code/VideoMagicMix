@@ -1,70 +1,62 @@
-# Windows 构建和发布
+# 构建、验收与发布
 
-## VideoMatrix 实际做法
+## 范围
 
-2026-10-16 核查上游 main：
+当前发布只包含 v0.1.11。保留旧版本标签和 Release，不重新打包旧版，不提交用户素材。源码根目录为本仓库；应用源码、完整包和教程指向同一版本。
 
-- [Windows workflow](https://github.com/w2968066/VideoMatrix--/blob/main/.github/workflows/build-windows.yml)：安装依赖、获取 FFmpeg、PyInstaller 构建后端、Electron Builder 生成 NSIS、上传 Release。
-- [后端 spec](https://github.com/w2968066/VideoMatrix--/blob/main/backend/videomatrix-backend.spec)：媒体工具及思源字体随独立后端分发。
-- [桌面配置](https://github.com/w2968066/VideoMatrix--/blob/main/frontend/package.json)：Electron + React、NSIS 安装器、extraResources 带入后端。
-- [后端依赖](https://github.com/w2968066/VideoMatrix--/blob/main/backend/requirements.txt)：没有 faster-whisper。传统混剪不需要本项目新增的语音识别模型。
-- [v2.8.0](https://github.com/w2968066/VideoMatrix--/releases/tag/v2.8.0)：Windows 包 `VideoMatrix.Setup.2.8.0.exe`，278101388 字节；另有 Mac DMG 和更新清单。
+## 开发环境
 
-该仓库有完整源码，不只是 skill。源码按模块区分，二进制和构建输出被忽略；也有历史单文件脚本和大量版本说明，不能据此断言每行代码都已审查。安装 skill 本身不会安装软件或模型。
-
-本项目采用“源码仓库 + 独立后端 + Electron 安装包”，另外提供本地 ASR 模型。
-PyInstaller 使用目录模式，避免每次启动识别进程都解压推理 DLL。
-保持现有 frontend/desktop 分工，不为相同的目录名称重写界面框架。
-
-## 构建
-
-需要 Windows x64、Python 3.12、Node.js 20+、网络，在项目根目录执行：
+Windows x64、Python 3.12 x64、Node.js 20。普通用户不需要这些依赖。
 
 ```powershell
 npm ci
 npm run package
 ```
 
-脚本建立虚拟环境、安装锁定依赖、准备和校验资产、跑测试、汇总许可、冻结后端、生成 NSIS，并检查独立后端和桌面启动。
-模型约 461 MiB，FFmpeg 下载包约 104 MiB，构建缓存不进仓库。
-只复制模型的四个必要文件，不复制 Hugging Face 缓存中的重复副本。
+构建脚本安装锁定 Python 依赖，获取并校验模型/媒体工具/字体，运行单元测试，冻结后端，生成 NSIS 安装包，执行离线 ASR/实际渲染/桌面冒烟测试，导出干净源码和完整目录 ZIP。
 
-## 验收
+模型固定到 Hugging Face revision；FFmpeg 8.1.1 下载包固定 SHA256；HarmonyOS 字体使用固定版本镜像并验证 Git 对象哈希，保持原文件和许可。首次构建要联网，安装后本地识别不下载模型。
+
+PyInstaller 在短临时路径生成，再复制到 build/backend，避免 Windows 深层路径导致缺 DLL/文件。脚本仅镜像生成的 build/backend 子目录。
+
+## 独立测试
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime
-# 冻结后的 ASR 子进程测试：
-.\.venv\Scripts\python.exe scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime --voice "配音.wav"
-# 完整 HTTP 导入/识别/预检/预览/单条渲染：
-.\.venv\Scripts\python.exe scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime --voice "配音.wav" --render
-# 桌面窗口及 preload 桥接：
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+node --test scripts/test-window-controls.cjs
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make_smoke_voice.ps1
+.\.venv\Scripts\python.exe scripts/smoke_packaged.py dist/win-unpacked/resources/app-runtime --voice build/smoke-voice.wav --render
 .\.venv\Scripts\python.exe scripts/smoke_desktop.py dist/win-unpacked/VideoMagicMix.exe
 ```
 
-测试使用独立临时数据、空 PATH、离线模型。提供真实配音时必须识别到词级时间戳；
-`--render` 使用识别文本构建测试文案，只证明技术链路，不保证任意 Excel 与配音匹配。
-测试输出独立保存，不混入正式产出。
+测试使用系统语音合成的非私人音频和合成视频，空 PATH、离线模型、临时数据目录。覆盖词级 ASR、导入/匹配、递归扫描、取消勾选、预渲染、试听、Hook 无 BGM、字幕预览、完整渲染与全片解码。
+它证明技术链路，不保证所有业务录音都能识别准确。干净 GitHub Windows runner 与用户实际电脑是不同验收环境，不得混称。
 
-正式发布前还需在无 Python/Node/FFmpeg 的另一台 Windows 10/11 x64 安装测试，
-覆盖中文和空格路径、目录选择、真实业务录音、字幕位置和输出数量。
-安装器未做代码签名；本机通过不能代替另一台机器验收。
+## Release 附件
 
-2026-10-16 本机已验证：20 项单元测试通过；清空 PATH、离线模式下，冻结后端的词级 ASR、HTTP 导入/匹配/预检、内置思源黑体 ASS 预览与单条 1080×1920 带音轨输出通过；Electron 隐藏窗口加载及 preload 桥接通过。
-完整链路测试使用 4 秒录音与合成画面；不代表所有真实长录音均能准确匹配。
-最终 FFmpeg 8.1.1 资源包已验证 SHA256；完整应用复制到含中文和空格的新路径后，上述桌面、离线 ASR、预览和渲染测试再次通过。
-本地已生成 NSIS 安装器 `VideoMagicMix-Setup-0.1.0-x64.exe`（657126952 字节），尚未在另一台电脑实际安装。
-源码导出采用允许清单，已检查不包含用户素材、音频、成片、Excel、模型、EXE、DLL、虚拟环境或 node_modules。
+- `VideoMagicMix-Setup-0.1.11-x64.exe`：NSIS 安装版。
+- `VideoMagicMix-Windows-0.1.11-x64.zip`：完整目录版；内含每文件校验清单。
+- `VideoMagicMix-Source-0.1.11.zip`：干净源码，不能直接运行。
+- `latest.yml`、安装包 `.blockmap`：Electron 自动更新使用。
+- `SHA256SUMS.txt`：发布附件 SHA256。
 
-同日 `npm audit` 对现有开发依赖报告 19 项（4 moderate / 14 high / 1 critical），涉及旧版 Electron 和构建依赖链。
-本次未进行跨主版本升级，公开正式发布前需要单独升级和回归；不能把目前的打包验收当成完整安全审计。
+资源体积较大，放 GitHub Releases，不放 Git 历史。仓库里的字体二进制由构建脚本获取，许可证和来源记录入库。
 
-## GitHub 分工
+## 发布顺序
 
-1. 以本项目源码目录作为仓库根目录，遵守 `.gitignore`，不上传整个 outputs 或 dist。
-2. `scripts/export_source.py` 导出干净源码 ZIP，用于交接；它不是安装包。
-3. 安装器及 SHA256 放 Releases，可另外提供 Portable EXE。
-4. 保留第三方许可，发布前落实所用 FFmpeg 构建的 GPL 完整对应源码获取方式。
-5. Actions 默认只构建并保留 artifact。维护者先创建 Release，再手动运行工作流并填写 `release_tag`（例如 `v0.1.0`），即可从该标签构建、验证并上传附件；留空只保留 artifact。发布任务不会覆盖已有同名附件，重复执行前应先核对现有文件。
+1. 核对源码与指定本地 v0.1.11 的 backend、frontend/app.js、desktop 行为一致，仅整理发布资源和说明。
+2. 运行测试、核对无私人文件，提交源码并创建 v0.1.11 标签。
+3. 创建 draft Release。运行 `Build Windows installer`，`release_tag` 填 v0.1.11。
+4. 工作流在干净 Windows runner 构建验收，成功后将附件上传到草稿；失败不能发布。
+5. 核对附件大小/哈希、最新更新清单、安装包版本；测试下载/解压/启动。只有完成要求的检查，才取消 draft 并设为 Latest。
+6. 从公开 latest 链接核对下载；执行 INSTALL_FOR_CODEX 中的脚本验证。记录实际已完成和未完成的验收，不把待测写成通过。
 
-用户素材、配音、成片、环境文件、日志、`.venv` 和开发机路径不随包分发。
-项目/任务状态目前只存在内存中，重启后需要重新导入，尚不支持项目持久化。
+标签 push 也会构建，但不自动发布。手动 release_tag 的上传不覆盖同名附件，已有附件需要维护者先核对，不能直接覆盖已发布版本。
+
+## 许可证与数据
+
+保留应用和第三方许可。FFmpeg 为 GPL-enabled 构建，附实际构建版本、编译信息和依赖源码获取说明；模型/字体也有独立许可。HarmonyOS 使用许可要求显著标注，本软件页脚提供字体声明和完整许可。
+
+不发布个人 Excel、音频、视频、输出、日志、凭据、用户目录。发布前检查源码导出允许清单和目录包 FILE-MANIFEST.json。
+
+v0.1.11 继续使用独立 `VideoMagicMix-balanced` 用户目录，不迁移/删除旧数据。项目状态只在内存中，教程应写明重启后重新导入。安装包未签名，不能声称已通过 SmartScreen 信任。

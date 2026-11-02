@@ -50,14 +50,16 @@ class ScriptScheme:
 class BodyConfig:
     scheme_id: str
     row_key: str
-    threshold: float = 1.15
-    candidate_count: int = 1
+    threshold: float = 1.4
+    min_speed: float = 0.9
+    candidate_count: int = 0
     recommended_threshold: float | None = None
     actual_candidate_count: int = 0
     target_duration: float | None = None
     scanned_video_count: int = 0
     user_configured: bool = False
-    control_mode: str = "candidate_count"
+    control_mode: str = "default"
+    excluded_combinations: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -85,8 +87,21 @@ class Project:
     hook_dir: str = ""
     body_root_dir: str = ""
     output_dir: str = ""
+    bgm_path: str = ""
+    bgm_volume: float = 0.3
+    voice_volume: float = 1.0
+    hook_volume: float = 1.0
+    max_overlap: float | None = 0.5
+    recent_window: int = 3
     body_threshold: float = 1.15
-    output_limit: int | None = None
+    output_limit: int | None = 30
+    output_format: str = "mov"
+    output_video_codec: str = "hevc"
+    output_resolution: str = "1080x1920"
+    output_fps: int = 30
+    output_video_bitrate: str = "20M"
+    output_audio_bitrate: str = "192k"
+    output_audio_sample_rate: int = 44100
     schemes: list[ScriptScheme] = field(default_factory=list)
     body_mapping: dict[str, str] = field(default_factory=dict)
     body_configs: dict[str, dict[str, BodyConfig]] = field(default_factory=dict)

@@ -31,23 +31,25 @@ jobs:
         run: npm ci
       - name: Build standalone backend and installer
         shell: pwsh
-        run: ./scripts/build-windows.ps1 -Target nsis
-      - name: Export clean source
-        shell: pwsh
         run: |
-          ./.venv/Scripts/python.exe scripts/export_source.py
-          if ($LASTEXITCODE -ne 0) { throw 'Source export failed.' }
-          Get-ChildItem dist -File -Filter '*Source*.zip' | ForEach-Object {
-            $digest = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            Set-Content -LiteralPath ($_.FullName + '.sha256') -Value ($digest + '  ' + $_.Name) -Encoding ASCII
+          $releaseTag = '${{ inputs.release_tag }}'
+          if ($releaseTag) {
+            $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            if ($releaseTag -ne "v$packageVersion") { throw "Release tag $releaseTag must match package version v$packageVersion." }
           }
+          ./scripts/build-windows.ps1 -Target nsis
+          if ($LASTEXITCODE -ne 0) { throw 'Windows package build failed.' }
       - uses: actions/upload-artifact@v4
         with:
           name: VideoMagicMix-Windows-x64
           path: |
             dist/*Setup*.exe
             dist/*.sha256
+            dist/*.blockmap
+            dist/latest.yml
             dist/*Source*.zip
+            dist/*Windows*.zip
+            dist/SHA256SUMS.txt
   publish:
     if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
     needs: windows
@@ -66,4 +68,6 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           gh release view "$RELEASE_TAG"
-          gh release upload "$RELEASE_TAG" dist/*Setup*.exe dist/*.sha256 dist/*Source*.zip
+          gh release upload "$RELEASE_TAG" dist/*Setup*.exe dist/*.sha256 dist/*.blockmap dist/latest.yml dist/*Source*.zip dist/*Windows*.zip dist/SHA256SUMS.txt
+          # Keep the release draft until all assets exist and an external download
+          # has been verified. Publishing/Latest is a separate maintainer action.

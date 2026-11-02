@@ -1,18 +1,116 @@
 import unittest
 import tempfile
+import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 from openpyxl import Workbook
 
 from backend.asr import TranscriptSegment, TranscriptWord, match_body_cues, match_transcript
 from backend.excel_parser import import_workbook
-from backend.mixer import MediaInfo, body_combination, body_combinations, body_threshold_for_count, complete_hook_candidates, list_videos
-from backend.models import SubtitleStyle
+from backend.mixer import MediaInfo, Selection, body_combination, body_combinations, body_speed_range_for_count, complete_hook_candidates, list_videos, render_video
+from backend.models import BodyConfig, Project, ScriptScheme, ScriptSegment, SubtitleStyle
 from backend.planning import allocate_round_robin, normalize_output_limit
 from backend.subtitles import build_ass, sanitize_style, split_subtitle_text
 
 
 class CoreTests(unittest.TestCase):
+    def test_body_combination_preview_returns_relative_names_and_speed(self):
+        import backend.main as main
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = Project(project_id="p1", project_name="test", excel_path="", sheet_name="")
+            project.body_mapping["Body1"] = directory
+            scheme = ScriptScheme(
+                scheme_id="scheme-1",
+                source_column="C",
+                display_name="字幕1",
+                segments=[ScriptSegment("Body1", "刻字", "文案", "文案", start_seconds=0, end_seconds=10)],
+            )
+            project.schemes.append(scheme)
+            selected = Selection(
+                [MediaInfo(str(Path(directory) / "A.mp4"), 8), MediaInfo(str(Path(directory) / "sub" / "B.mp4"), 3)],
+                11,
+                10,
+                10 / 11,
+                1.1,
+                True,
+            )
+            with patch.object(main, "get_project", return_value=project), patch.object(
+                main,
+                "refresh_body_config",
+                return_value=(BodyConfig("scheme-1", "Body1", threshold=1.1), [selected.files[0], selected.files[1]], [selected]),
+            ):
+                result = main.preview_body_combinations("p1", "scheme-1", "Body1", "current")
+
+        self.assertEqual(result["candidate_count"], 1)
+        self.assertEqual(result["combinations"][0]["files"], ["A.mp4", "sub/B.mp4"])
+        self.assertEqual(result["combinations"][0]["source_duration"], 11)
+        self.assertAlmostEqual(result["combinations"][0]["playback_speed"], 1.1)
+        self.assertTrue(result["combinations"][0]["within_current_threshold"])
+
+    def test_all_body_combinations_preview_ignores_current_threshold(self):
+        import backend.main as main
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = Project(project_id="p1", project_name="test", excel_path="", sheet_name="")
+            project.body_mapping["Body1"] = directory
+            scheme = ScriptScheme(
+                scheme_id="scheme-1",
+                source_column="C",
+                display_name="字幕1",
+                segments=[ScriptSegment("Body1", "刻字", "文案", "文案", start_seconds=0, end_seconds=10)],
+            )
+            project.schemes.append(scheme)
+            files = [MediaInfo(str(Path(directory) / "A.mp4"), 8), MediaInfo(str(Path(directory) / "B.mp4"), 3)]
+            accepted = Selection(files, 11, 10, 10 / 11, 1.1, True)
+            needs_higher_threshold = Selection([MediaInfo(str(Path(directory) / "C.mp4"), 12)], 12, 10, 10 / 12, 1.2, True)
+            with patch.object(main, "get_project", return_value=project), patch.object(
+                main,
+                "refresh_body_config",
+                return_value=(BodyConfig("scheme-1", "Body1", threshold=1.1), files, [accepted]),
+            ), patch.object(main, "body_combinations", return_value=[accepted, needs_higher_threshold]) as enumerate_combinations:
+                result = main.preview_body_combinations("p1", "scheme-1", "Body1", "all")
+
+        self.assertEqual(result["scope"], "all")
+        self.assertEqual(result["candidate_count"], 2)
+        self.assertTrue(result["combinations"][0]["within_current_threshold"])
+        self.assertFalse(result["combinations"][1]["within_current_threshold"])
+        self.assertAlmostEqual(result["combinations"][1]["required_threshold"], 1.2)
+        self.assertEqual(enumerate_combinations.call_args.kwargs["max_results"], 70000)
+
+    def test_bgm_loops_and_is_trimmed_to_body_narration_duration(self):
+        selections = [
+            Selection([MediaInfo("hook.mp4", 3.0)], 3.0, 3.0, 1.0, 1.0, True),
+            Selection([MediaInfo("body.mp4", 7.0)], 7.0, 7.0, 1.0, 1.15, True),
+        ]
+        completed = subprocess.CompletedProcess([], 0, "", "")
+        with tempfile.TemporaryDirectory() as directory, patch("backend.mixer.subprocess.run", return_value=completed) as run:
+            render_video(selections, "voice.mp3", str(Path(directory) / "output.mp4"), ffmpeg="ffmpeg", bgm_path="music.mp3", bgm_volume=0.25)
+        command = run.call_args.args[0]
+        filters = command[command.index("-filter_complex") + 1]
+        self.assertEqual(command[command.index("-stream_loop") + 1], "-1")
+        self.assertIn("[3:a:0]atrim=duration=7.000000", filters)
+        self.assertIn("[voicegain][bgm]amix", filters)
+        self.assertIn("[hookgain][bodymix]concat", filters)
+        self.assertIn("volume=0.2500", filters)
+        self.assertIn("amix=inputs=2:duration=first", filters)
+        self.assertEqual(command[command.index("-map", command.index("-filter_complex") + 1) + 1], "[video]")
+
+    def test_output_profile_passes_editing_export_parameters_to_ffmpeg(self):
+        selections = [
+            Selection([MediaInfo("hook.mp4", 3.0)], 3.0, 3.0, 1.0, 1.0, True),
+            Selection([MediaInfo("body.mp4", 7.0)], 7.0, 7.0, 1.0, 1.15, True),
+        ]
+        with tempfile.TemporaryDirectory() as directory, patch("backend.mixer.subprocess.run", return_value=subprocess.CompletedProcess([], 0, "", "")) as run:
+            render_video(selections, "voice.mp3", str(Path(directory) / "output.mov"), width=1080, height=1920, fps=30, video_codec="hevc", video_bitrate="20M", audio_bitrate="192k", audio_sample_rate=44100, container="mov")
+        command = run.call_args.args[0]
+        self.assertIn("libx265", command)
+        self.assertEqual(command[command.index("-r") + 1], "30")
+        self.assertEqual(command[command.index("-b:v") + 1], "20M")
+        self.assertEqual(command[command.index("-b:a") + 1], "192k")
+        self.assertEqual(command[command.index("-ar") + 1], "44100")
+
     def test_all_hooks_are_complete_candidates(self):
         files = [MediaInfo("a.mp4", 9), MediaInfo("b.mp4", 10.5), MediaInfo("c.mp4", 5)]
         matches = complete_hook_candidates(files)
@@ -30,15 +128,34 @@ class CoreTests(unittest.TestCase):
         self.assertGreaterEqual(len(results), 2)
         self.assertTrue(all(len({item.path for item in result.files}) == len(result.files) for result in results))
 
+    def test_default_range_excludes_material_below_point_nine_speed(self):
+        self.assertEqual(body_combinations([MediaInfo("only-8s.mp4", 8)], 10, 1.2), [])
+        low, high = body_speed_range_for_count([MediaInfo("only-8s.mp4", 8)], 10, 1)
+        self.assertLessEqual(low, 0.8)
+        self.assertEqual(len(body_combinations([MediaInfo("only-8s.mp4", 8)], 10, high, min_speed=low)), 1)
+
+    def test_body_speeds_up_long_enough_combination_and_counts_one_order(self):
+        files = [MediaInfo("a-8s.mp4", 8), MediaInfo("b-3s.mp4", 3)]
+        results = body_combinations(files, 10, 1.1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual([item.path for item in results[0].files], ["a-8s.mp4", "b-3s.mp4"])
+        self.assertEqual(results[0].source_duration, 11)
+        self.assertAlmostEqual(results[0].speed_factor, 10 / 11)
+        self.assertEqual(body_combinations(files, 10, 1.09), [])
+
+    def test_body_combination_diagnostic_explains_needed_speed(self):
+        result = body_combination([MediaInfo("only-8s.mp4", 8)], 10, 1.2)
+        self.assertFalse(result.accepted)
+        self.assertIn("0.800", result.message)
+
     def test_body_threshold_for_count_covers_requested_candidates(self):
         files = [MediaInfo("a", 4), MediaInfo("b", 5), MediaInfo("c", 7), MediaInfo("d", 5)]
-        threshold = body_threshold_for_count(files, 9, 4)
-        self.assertIsNotNone(threshold)
-        combinations = body_combinations(files, 9, threshold)
+        low, high = body_speed_range_for_count(files, 9, 4)
+        combinations = body_combinations(files, 9, high, min_speed=low)
         self.assertGreaterEqual(len(combinations), 4)
 
     def test_body_threshold_for_count_returns_none_without_combinations(self):
-        self.assertIsNone(body_threshold_for_count([MediaInfo("a", 0)], 9, 1))
+        self.assertIsNone(body_speed_range_for_count([MediaInfo("a", 0)], 9, 1))
 
     def test_ass_style_has_explicit_size_and_position(self):
         ass = build_ass([(0, 2.5, "这是一段字幕文本")], SubtitleStyle(font_name="Test Font", font_size=52, alignment=2, outline_width=3, shadow=1))
@@ -88,6 +205,53 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([cue.text for cue in cues], ["这学期开学", "我把孩子的铅笔"])
         self.assertAlmostEqual(cues[0].end_seconds, 1.0)
         self.assertAlmostEqual(cues[1].start_seconds, 2.0)
+
+    def test_body_cues_tolerate_common_asr_units_and_homophones(self):
+        transcript = [TranscriptSegment("他的签心是升级35毫米石墨铅芯韧性特别好然后下一段", 0, 4, words=[
+            TranscriptWord("他的签心是升级35毫米石墨铅芯韧性特别好", 0, 2, 0.8),
+            TranscriptWord("然后下一段", 2, 4, 0.8),
+        ])]
+        matches, failures = match_body_cues([
+            ("Body1", "它的铅芯是升级3.5mm石墨铅芯，韧性特别好"),
+            ("Body2", "然后下一段"),
+        ], transcript, 10)
+        self.assertFalse(failures)
+        self.assertEqual([item["row_key"] for item in matches], ["Body1", "Body2"])
+
+    def test_body_cues_keep_progress_after_failed_row(self):
+        transcript = [TranscriptSegment("第一段 正确的第二段", 0, 2, words=[
+            TranscriptWord("第一段", 0, 0.8, 0.8),
+            TranscriptWord("正确的第二段", 1, 2, 0.8),
+        ])]
+        matches, failures = match_body_cues([
+            ("Body1", "完全不存在的长文案"),
+            ("Body2", "正确的第二段"),
+        ], transcript, 10)
+        self.assertTrue(failures)
+        self.assertTrue(any(item["row_key"] == "Body2" for item in matches))
+
+    def test_workbook_supports_twenty_body_rows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "twenty.xlsx"
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["字段", "分组", "字幕1"])
+            sheet.append(["Hook", "", ""])
+            for index in range(1, 21):
+                sheet.append([f"Body{index}", f"分组{index}", f"第{index}段文案"])
+            workbook.save(path)
+            _, schemes, errors, _ = import_workbook(str(path))
+        self.assertFalse(errors)
+        self.assertEqual(len([item for item in schemes[0].segments if item.row_key.startswith("Body")]), 20)
+
+    def test_body_root_resolves_slash_delimited_nested_group(self):
+        import backend.main as main
+
+        with tempfile.TemporaryDirectory() as directory:
+            nested = Path(directory) / "开头" / "刻字"
+            nested.mkdir(parents=True)
+            result = main.resolve_body_group_directory(directory, "开头/刻字")
+        self.assertEqual(Path(result), nested)
 
     def test_list_videos_recurses_into_subdirectories(self):
         with tempfile.TemporaryDirectory() as directory:

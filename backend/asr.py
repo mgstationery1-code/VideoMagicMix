@@ -68,7 +68,8 @@ class FasterWhisperEngine(ASREngine):
                 raise ASRError("安装包缺少本地 Whisper 模型，请重新下载完整安装包；桌面版不会自动联网下载模型。")
             preferred_device = "cuda" if self.device == "auto" and ctranslate2_cuda_available() else ("cpu" if self.device == "auto" else self.device)
             try:
-                self._model = WhisperModel(model_source, device=preferred_device, compute_type=compute_type)
+                cpu_threads = max(1, int(os.getenv("WHISPER_CPU_THREADS", str(max(1, (os.cpu_count() or 2) - 1)))) )
+                self._model = WhisperModel(model_source, device=preferred_device, compute_type=compute_type, cpu_threads=cpu_threads, num_workers=1)
                 self._active_device = preferred_device
             except Exception:
                 if preferred_device != "cuda":
@@ -82,7 +83,8 @@ class FasterWhisperEngine(ASREngine):
             raise ASRError(f"配音文件不存在：{audio_path}")
         model = self._load()
         try:
-            segments, _ = model.transcribe(audio_path, language="zh", vad_filter=True, word_timestamps=True)
+            beam_size = max(1, int(os.getenv("WHISPER_BEAM_SIZE", "1")))
+            segments, _ = model.transcribe(audio_path, language="zh", vad_filter=True, word_timestamps=True, beam_size=beam_size, best_of=1, condition_on_previous_text=False)
             return [_whisper_segment(s) for s in segments]
         except Exception:
             if self._active_device != "cuda":
@@ -91,7 +93,7 @@ class FasterWhisperEngine(ASREngine):
             compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
             self._model = WhisperModel(self.model_path or self.model_size, device="cpu", compute_type="int8" if compute_type == "int8" else compute_type)
             self._active_device = "cpu"
-            segments, _ = self._model.transcribe(audio_path, language="zh", vad_filter=True, word_timestamps=True)
+            segments, _ = self._model.transcribe(audio_path, language="zh", vad_filter=True, word_timestamps=True, beam_size=1, best_of=1, condition_on_previous_text=False)
             return [_whisper_segment(s) for s in segments]
 
 
@@ -170,9 +172,28 @@ def _character_timeline(transcript: list[TranscriptSegment]) -> tuple[str, list[
     return "".join(text_parts), timings
 
 
+def _normalize_match_text(value: str) -> str:
+    """Normalize common Chinese ASR variants without changing subtitle text."""
+    text = normalize_text(value)
+    # Whisper commonly emits spoken Chinese units or homophones for product
+    # terms. These aliases only affect matching; the original Excel wording
+    # remains unchanged in the generated subtitles.
+    aliases = (
+        ("毫米", "mm"), ("公厘", "mm"), ("厘米", "cm"),
+        ("签笔", "铅笔"), ("签芯", "铅芯"), ("签心", "铅芯"),
+        ("陈光", "晨光"), ("断签", "断铅"),
+    )
+    for source, target in aliases:
+        text = text.replace(source, target)
+    return text
+
+
 def match_body_cues(expected: list[tuple[str, str]], transcript: list[TranscriptSegment], max_chars: int = 10, minimum_similarity: float = 0.72) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Match ordered Body rows and return word-timed subtitle cues."""
-    actual, timings = _character_timeline(transcript)
+    actual_raw, timings = _character_timeline(transcript)
+    # Keep timing indexes aligned with the character timeline. Alias matching
+    # is applied to whole phrases rather than changing the timeline length.
+    actual = actual_raw
     cursor = 0
     matches: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -182,33 +203,40 @@ def match_body_cues(expected: list[tuple[str, str]], transcript: list[Transcript
         ratio = lambda a, b: 100 if a == b else 0
 
     for index, (row_key, text) in enumerate(expected):
-        wanted = normalize_text(text)
+        wanted = _normalize_match_text(text)
         if not wanted:
             failures.append({"index": index, "row_key": row_key, "expected": text, "reason": "文案为空"})
             continue
-        best: tuple[float, int, int, str] | None = None
-        minimum_length = max(1, int(len(wanted) * 0.7))
-        maximum_length = min(len(actual) - cursor, max(minimum_length, int(len(wanted) * 1.4) + 2))
-        # The narration is required to follow Excel order, so every row starts at
-        # the current cursor.  Only its end is searched.
-        for length in range(minimum_length, maximum_length + 1):
-            candidate = actual[cursor:cursor + length]
-            score = ratio(wanted, candidate) / 100.0
-            ranked = (score, -abs(length - len(wanted)), length, candidate)
-            if best is None or ranked > best:
-                best = ranked
-        if best is None or best[0] < minimum_similarity:
+        best: tuple[float, int, int, int, str] | None = None
+        minimum_length = max(1, int(len(wanted) * 0.45))
+        maximum_start = min(len(actual) - 1, cursor + max(12, int(len(wanted) * 0.8))) if actual else cursor
+        # ASR can insert/drop a short word at a Body boundary. Search a bounded
+        # forward window instead of forcing every row to begin at one character.
+        for start in range(cursor, maximum_start + 1):
+            maximum_length = min(len(actual) - start, max(minimum_length, int(len(wanted) * 1.8) + 8))
+            for length in range(minimum_length, maximum_length + 1):
+                candidate_raw = actual[start:start + length]
+                candidate = _normalize_match_text(candidate_raw)
+                score = ratio(wanted, candidate) / 100.0
+                ranked = (score, -abs(length - len(wanted)), -start, length, candidate_raw)
+                if best is None or ranked > best:
+                    best = ranked
+        effective_minimum = min(minimum_similarity, 0.64 if len(wanted) >= 12 else minimum_similarity)
+        if best is None or best[0] < effective_minimum:
             recognized = actual[cursor:cursor + max(1, len(wanted))]
             failures.append({
                 "index": index, "row_key": row_key, "expected": text,
                 "recognized": recognized,
                 "time_range": [timings[cursor]["start"], timings[min(len(timings) - 1, cursor + max(0, len(recognized) - 1))]["end"]] if timings and cursor < len(timings) else None,
                 "similarity": round(best[0], 4) if best else 0.0,
-                "reason": "无法按 Body 顺序匹配 ASR 文本",
+                "reason": "无法按 Body 顺序匹配 ASR 文本（已尝试容错匹配，请检查配音内容或文本顺序）",
             })
+            # Keep the cursor at the last confirmed boundary. Later rows still
+            # search forward from it, so one bad row does not make every later
+            # row report the same ASR prefix.
             continue
-        length, recognized = best[2], best[3]
-        actual_start, actual_end = cursor, cursor + length
+        actual_start, length, recognized = -best[2], best[3], best[4]
+        actual_end = actual_start + length
         row_start = float(timings[actual_start]["start"])
         row_end = float(timings[actual_end - 1]["end"])
         cue_items: list[SubtitleCue] = []

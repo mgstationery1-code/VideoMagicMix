@@ -4,6 +4,7 @@ node_modules/
 
 # Generated desktop builds
 dist/
+dist-*/
 build/
 .build-cache/
 release/
@@ -13,6 +14,7 @@ tools/ASSET-RECORD.json
 fonts/*.otf
 fonts/*.ttf
 fonts/SourceHanSans-LICENSE.txt
+frontend/assets/fonts/*.ttf
 
 # Runtime data
 data/uploads/

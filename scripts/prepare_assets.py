@@ -115,6 +115,22 @@ def prepare_font() -> None:
         download_github_text("adobe-fonts/source-han-sans", "LICENSE.txt", FONT_REVISION, license_path)
 
 
+def prepare_ui_font() -> None:
+    """Unmodified HarmonyOS fonts, pinned to upstream mirror Git objects."""
+    revision = '33172a5f6b9122f2310a6a26c64f7f64e38a8456'
+    objects = {
+        'HarmonyOS_Sans_SC_Regular.ttf': 'aff150a137831c29d4d3cba994ac1b8e3a9940fa',
+        'HarmonyOS_Sans_SC_Bold.ttf': '5c925d1fb1f1eccc85a1c7c78cc71a50ef9cc2db',
+        'LICENSE.txt': '211a701ac2e36d31d2475f282819cbed739882f7',
+    }
+    for name, expected in objects.items():
+        target = ROOT / 'frontend/assets/fonts' / name
+        download(f'https://raw.githubusercontent.com/ajacocks/harmonyos-sans-font/{revision}/HarmonyOS_Sans_SC/{name}', target)
+        content = target.read_bytes()
+        if hashlib.sha1(f'blob {len(content)}\0'.encode() + content).hexdigest() != expected:
+            raise RuntimeError(f'HarmonyOS Git object verification failed: {name}')
+
+
 def download_github_text(repository: str, name: str, revision: str, target: Path) -> None:
     if target.is_file():
         return
@@ -160,6 +176,7 @@ def prepare_media_tools() -> None:
 if __name__ == "__main__":
     prepare_models()
     prepare_font()
+    prepare_ui_font()
     prepare_media_tools()
     download_github_text("w2968066/VideoMatrix--", "LICENSE", "main", ROOT / "licenses/VideoMatrix-MIT.txt")
     download_github_text("openai/whisper", "LICENSE", "main", ROOT / "licenses/Whisper-MIT.txt")
