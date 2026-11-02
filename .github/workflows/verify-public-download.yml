@@ -21,8 +21,8 @@ jobs:
         env:
           INSTALL_VERSION: ${{ inputs.version }}
         run: |
+          $ErrorActionPreference = 'Stop'
           ./scripts/install-windows.ps1 -Version $env:INSTALL_VERSION -Destination C:/vmm-public-install -NoLaunch
-          if ($LASTEXITCODE -ne 0) { throw 'Public installer failed.' }
       - name: Start publicly downloaded version offline
         shell: pwsh
         env:
