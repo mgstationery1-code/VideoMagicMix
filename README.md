@@ -1,20 +1,20 @@
-# VideoMagicMix · v0.1.11
+# VideoMagicMix · v0.1.16
 
 Windows 本地批量混剪软件：完整 Hook 开头接 Body 素材组合，使用你准备的配音，自动识别时间、生成逐句字幕、添加背景音乐并批量导出。
 
-本次发布 **v0.1.11 均衡轮换版**，不重新打包或上传旧版。
+当前最新版为 **v0.1.16 简繁体字幕匹配修复版**。
 
 ## 新电脑直接使用
 
 1. 打开 [最新版下载页](https://github.com/mgstationery1-code/VideoMagicMix/releases/latest)。
-2. 下载 `VideoMagicMix-Setup-0.1.11-x64.exe` 并安装；或者下载 `VideoMagicMix-Windows-0.1.11-x64.zip`，完整解压后双击 `VideoMagicMix.exe`。
+2. 下载 `VideoMagicMix-Setup-0.1.16-x64.exe` 并安装；或者下载 `VideoMagicMix-Windows-0.1.16-x64.zip`，完整解压后双击 `VideoMagicMix.exe`。
 3. 按 [新手教程](docs/USER_GUIDE.md) 先生成 1–3 条测试视频，再批量生成。
 
 适用 Windows 10/11 **x64**。完整包包含 Electron、Python 后端、FFmpeg、FFprobe、Whisper small 模型、思源字幕字体和 HarmonyOS 界面字体。下载后识别和渲染在本机运行，无需另装 Python、Node.js、FFmpeg，无需首次下载模型，不强制 NVIDIA 显卡。
 
 **不要把 `Code → Download ZIP` 当安装包，不要只复制单个 EXE。** 建议预留至少 10 GB 空间供安装、缓存和测试，批量成片需要更多空间。CPU 识别速度随硬件和音频长度变化。
 
-让另一台电脑的 Codex 协助安装：[INSTALL_FOR_CODEX.md](INSTALL_FOR_CODEX.md)。无需安装 skill。
+直接下载完整安装包即可使用，不需要安装 Codex 或额外 skill。
 
 ## 本版功能
 
@@ -37,7 +37,7 @@ Windows 本地批量混剪软件：完整 Hook 开头接 Body 素材组合，使
 | [新手教程](docs/USER_GUIDE.md) | 准备素材到成片，附实际例子 |
 | [Codex 安装](INSTALL_FOR_CODEX.md) | 下载、校验、独立解压、启动 |
 | [均衡轮换](docs/BALANCED_ROTATION.md) | 近期比较、曝光、限制 |
-| [发布说明](docs/RELEASE_0.1.11.md) | 本次内容和验收边界 |
+| [v0.1.16 发布说明](https://github.com/mgstationery1-code/VideoMagicMix/releases/tag/v0.1.16) | 本次内容和验收边界 |
 | [开发发布](docs/RELEASING.md) | 构建、测试、更新附件 |
 
 ## 已知限制
