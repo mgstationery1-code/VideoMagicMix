@@ -16,7 +16,7 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1
 ```
 
-可选 `-Version 0.1.11` 固定版本、`-Destination D:\VideoMagicMix-0.1.11` 指定不存在的目录、`-NoLaunch` 只安装。默认放在 `%LOCALAPPDATA%\Programs\VideoMagicMix-版本`。已有目录会停止，绝不删除或覆盖旧版。脚本创建桌面快捷方式。
+可选 `-Version 0.1.17` 固定版本、`-Destination D:\VideoMagicMix-0.1.17` 指定不存在的目录、`-NoLaunch` 只安装。默认放在 `%LOCALAPPDATA%\Programs\VideoMagicMix-版本`。已有目录会停止，绝不删除或覆盖旧版。脚本创建桌面快捷方式。
 
 也可下载同一 Release 的 Setup EXE，使用安装向导。不默认进行系统级静默安装。
 
@@ -30,3 +30,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows.ps1
 - 网络阻断时报告地址和具体错误，不改用不明来源。
 
 交付版本、EXE/快捷方式位置和 [新手教程](docs/USER_GUIDE.md)。项目状态不持久化，重启后需重新导入；CPU 速度随电脑性能变化。
+
